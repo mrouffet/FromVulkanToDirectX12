@@ -35,8 +35,8 @@ target_compile_options(FVTDX12_mainDX12 PRIVATE /W4 /WX)
 target_include_directories(FVTDX12_mainDX12 PRIVATE ${MY_AGILITY_SDK_INCLUDE_DIR})
 target_compile_definitions(FVTDX12_mainDX12 PRIVATE FORCE_AGILITY_SDK_615=1)
 
-target_link_libraries(FVTDX12_mainDX12 PUBLIC d3d12.lib dxgi.lib dxguid.lib d3dcompiler.lib)
-target_link_libraries(FVTDX12_mainDX12 PUBLIC glfw assimp stb SA_Logger SA_Maths)
+target_link_libraries(FVTDX12_mainDX12 PUBLIC d3d12.lib dxgi.lib dxguid.lib)
+target_link_libraries(FVTDX12_mainDX12 PUBLIC glfw assimp stb DirectXShaderCompiler SA_Logger SA_Maths)
 
 add_custom_command(
     TARGET FVTDX12_mainDX12
@@ -55,6 +55,21 @@ add_custom_command(
     $<TARGET_FILE_DIR:FVTDX12_mainDX12>/D3D12
 )
 
+### Fix dxcompiler.dll mUtils->CreateReflection.
+add_custom_command(
+	TARGET FVTDX12_mainDX12 POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E copy
+	${CMAKE_SOURCE_DIR}/ThirdParty/DirectXShaderCompiler/win/bin/dxcompiler.dll
+	$<TARGET_FILE_DIR:FVTDX12_mainDX12>
+)
+
+### Fix dxil.dll lookup.
+add_custom_command(
+	TARGET FVTDX12_mainDX12 POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E copy
+	${CMAKE_SOURCE_DIR}/ThirdParty/DirectXShaderCompiler/win/bin/dxil.dll
+	$<TARGET_FILE_DIR:FVTDX12_mainDX12>
+)
 
 
 # ===== Target mainVK =====
@@ -93,6 +108,8 @@ set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "Disable assimp build tests")
 add_subdirectory(ThirdParty/assimp)
 
 add_subdirectory(ThirdParty/stb)
+
+add_subdirectory(ThirdParty/DirectXShaderCompiler)
 
 
 ## SA libraries

@@ -257,11 +257,90 @@ D3D12_RECT scissorRect{}; // VkRect2D -> D3D12_RECT
 
 // = Lit =
 /**
-* Basic helper shader compiler header.
-* For more advanced features use DirectXShaderCompiler library.
-* Requires `d3dcompiler.lib`
+* DXC (DirectXShaderCompiler) library is the advanced DirectX 12 API for shader compiling.
+* This library is not native to DirectX12 library but required for compiling mesh shaders.
+* Base and native DirectX12 shader compilier is d3dcompiler.lib (d3dcompiler.h)
 */
-#include <d3dcompiler.h>
+#include <dxc/dxcapi.h>
+MComPtr<IDxcUtils> shaderCompilerUtils;
+MComPtr<IDxcCompiler3> shaderCompiler;
+MComPtr<ID3DBlob> CompileShader(std::wstring _path, std::wstring _entry, std::wstring _target, std::vector<std::wstring> _defines = {})
+{
+	MComPtr<IDxcBlobEncoding> blob;
+	DxcBuffer dx;
+	//ShaderIncluder includer; // Define your own shader includer class.
+
+	const HRESULT hrLoadFile = shaderCompilerUtils->LoadFile(_path.c_str(), nullptr, &blob);
+	if (FAILED(hrLoadFile))
+	{
+		SA_LOG((L"Load Shader {%1} failed!", _path), Error, DXC, (L"Error Code: %1", hrLoadFile));
+		return nullptr;
+	}
+
+	dx.Ptr = blob->GetBufferPointer();
+	dx.Size = blob->GetBufferSize();
+	dx.Encoding = 0;
+
+	std::vector<LPCWSTR> cArgs
+	{
+		L"-E",
+		_entry.c_str(),
+		L"-T",
+		_target.c_str(),
+		L"-HV",
+		L"2021",
+		DXC_ARG_WARNINGS_ARE_ERRORS,
+		DXC_ARG_PACK_MATRIX_ROW_MAJOR,
+		DXC_ARG_ALL_RESOURCES_BOUND,
+		/* Add include path for shader includer (Warning: must work both from VS and standalone .exe) */
+		//L"-I",
+		//L"/Resources/Shaders/HLSL"
+	};
+
+#if SA_DEBUG
+
+	cArgs.push_back(DXC_ARG_DEBUG);
+	cArgs.push_back(DXC_ARG_SKIP_OPTIMIZATIONS);
+
+#else
+
+	cArgs.push_back(DXC_ARG_OPTIMIZATION_LEVEL3);
+
+#endif
+
+	for (auto& define : _defines)
+	{
+		cArgs.push_back(L"-D");
+		cArgs.push_back(define.c_str());
+	}
+
+
+	MComPtr<IDxcResult> result;
+	shaderCompiler->Compile(&dx, cArgs.data(), static_cast<uint32_t>(cArgs.size()), nullptr /*&includer*/, IID_PPV_ARGS(&result));
+
+	HRESULT hr;
+	result->GetStatus(&hr);
+
+	if (FAILED(hr))
+	{
+		MComPtr<IDxcBlobUtf8> errors;
+		result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&errors), nullptr);
+
+		if (errors && errors->GetStringLength() > 0)
+		{
+			SA_LOG((L"Shader {%1:%2} Compilation failed!", _path, _entry), Error, DXC, errors->GetStringPointer());
+			return nullptr;
+		}
+
+		return nullptr;
+	}
+
+	MComPtr<ID3DBlob> code;
+	result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&code), nullptr);
+
+	return code;
+}
+
 
 MComPtr<ID3DBlob> litVertexShader; // VkShaderModule -> ID3DBlob
 MComPtr<ID3DBlob> litPixelShader;
@@ -840,7 +919,7 @@ int main()
 				for (uint32_t i = 0; i < bufferingCount; ++i)
 				{
 					const HRESULT hrSwapChainGetBuffer = swapchain->GetBuffer(i, IID_PPV_ARGS(&swapchainImages[i]));
-					if (hrSwapChainGetBuffer)
+					if (FAILED(hrSwapChainGetBuffer))
 					{
 						SA_LOG((L"Get Swapchain Buffer [%1] failed!", i), Error, DX12, (L"Error Code: %1", hrSwapChainGetBuffer));
 						return EXIT_FAILURE;
@@ -1065,12 +1144,22 @@ int main()
 					};
 				}
 
-#if SA_DEBUG
-				// Enable better shader debugging with the graphics debugging tools.
-				const UINT shaderCompileFlags = D3DCOMPILE_PACK_MATRIX_ROW_MAJOR | D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-#else
-				const UINT shaderCompileFlags = D3DCOMPILE_PACK_MATRIX_ROW_MAJOR | D3DCOMPILE_OPTIMIZATION_LEVEL3;
-#endif
+				// Shader Compiler
+				{
+					const HRESULT hCreateUtils = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&shaderCompilerUtils));
+					if (FAILED(hCreateUtils))
+					{
+						SA_LOG(L"Create DXC Shader Compiler Utils failed!", Error, DXC, (L"Error Code: %1", hCreateUtils));
+						return EXIT_FAILURE;
+					}
+
+					const HRESULT hCreateInstance = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&shaderCompiler));
+					if (FAILED(hCreateInstance))
+					{
+						SA_LOG(L"Create DXC Shader Compiler Instance failed!", Error, DXC, (L"Error Code: %1", hCreateInstance));
+						return EXIT_FAILURE;
+					}
+				}
 
 				// Lit
 				{
@@ -1237,40 +1326,18 @@ int main()
 					// Vertex Shader
 					if (true)
 					{
-						MComPtr<ID3DBlob> errors;
+						litVertexShader = CompileShader(L"Resources/Shaders/HLSL/LitShader.hlsl", L"mainVS", L"vs_6_5");
 
-						const HRESULT hrCompileShader = D3DCompileFromFile(L"Resources/Shaders/HLSL/LitShader.hlsl", nullptr, nullptr, "mainVS", "vs_5_0", shaderCompileFlags, 0, &litVertexShader, &errors);
-
-						if (FAILED(hrCompileShader))
-						{
-							std::string errorStr(static_cast<const char*>(errors->GetBufferPointer()), errors->GetBufferSize());
-							SA_LOG(L"Shader {LitShader.hlsl, mainVS} compilation failed!", Error, DX12, errorStr);
-
+						if (!litVertexShader)
 							return EXIT_FAILURE;
-						}
-						else
-						{
-							SA_LOG(L"Shader {LitShader.hlsl, mainVS} compilation success.", Info, DX12, litVertexShader.Get());
-						}
 					}
 
 					// Fragment Shader
 					{
-						MComPtr<ID3DBlob> errors;
+						litPixelShader = CompileShader(L"Resources/Shaders/HLSL/LitShader.hlsl", L"mainPS", L"ps_6_5");
 
-						const HRESULT hrCompileShader = D3DCompileFromFile(L"Resources/Shaders/HLSL/LitShader.hlsl", nullptr, nullptr, "mainPS", "ps_5_0", shaderCompileFlags, 0, &litPixelShader, &errors);
-
-						if (FAILED(hrCompileShader))
-						{
-							std::string errorStr(static_cast<const char*>(errors->GetBufferPointer()), errors->GetBufferSize());
-							SA_LOG(L"Shader {LitShader.hlsl, mainPS} compilation failed.", Error, DX12, errorStr);
-
+						if (!litPixelShader)
 							return EXIT_FAILURE;
-						}
-						else
-						{
-							SA_LOG(L"Shader {LitShader.hlsl, mainPS} compilation success.", Info, DX12, litPixelShader.Get());
-						}
 					}
 
 
@@ -2674,6 +2741,9 @@ int main()
 						litRootSign = nullptr;
 					}
 				}
+
+				shaderCompiler.Reset();
+				shaderCompilerUtils.Reset();
 			}
 
 

@@ -34,3 +34,7 @@ Makefile
 # Documentation generated files
 html/
 latex/
+
+# DirectXShaderCompiler
+!ThirdParty/DirectXShaderCompiler/win/[Bb]in/
+!ThirdParty/DirectXShaderCompiler/unix/[Bb]in/
