@@ -255,7 +255,41 @@ MComPtr<ID3D12DescriptorHeap> sceneDepthRTViewHeap; /* 0006-2 */
 D3D12_VIEWPORT viewport{}; // VkViewport -> D3D12_VIEWPORT
 D3D12_RECT scissorRect{}; // VkRect2D -> D3D12_RECT
 
-// = Lit =
+// === Shader Compiler ===
+/**
+* Basic native helper shader compiler header. Requires `d3dcompiler.lib`
+* For more advanced features use DirectXShaderCompiler library (see below).
+* /!\ WARNING /!\ Currently not used. Learning purpose only.
+*/
+#include <d3dcompiler.h>
+MComPtr<ID3DBlob> Native_CompileShader(std::wstring _path, std::string _entry, std::string _target/*, std::vector<std::wstring> _defines = {}*/)
+{
+#if SA_DEBUG
+	// Enable better shader debugging with the graphics debugging tools.
+	constexpr UINT shaderCompileFlags = D3DCOMPILE_PACK_MATRIX_ROW_MAJOR | D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#else
+	constexpr UINT shaderCompileFlags = D3DCOMPILE_PACK_MATRIX_ROW_MAJOR | D3DCOMPILE_OPTIMIZATION_LEVEL3;
+#endif
+
+	MComPtr<ID3DBlob> errors;
+	MComPtr<ID3DBlob> shader;
+
+	const HRESULT hrCompileShader = D3DCompileFromFile(_path.c_str(), nullptr, nullptr, _entry.c_str(), _target.c_str(), shaderCompileFlags, 0, &shader, &errors);
+
+	if (FAILED(hrCompileShader))
+	{
+		std::string errorStr(static_cast<const char*>(errors->GetBufferPointer()), errors->GetBufferSize());
+		SA_LOG(L"Shader {LitShader.hlsl, mainVS} compilation failed!", Error, DX12, errorStr);
+		return nullptr;
+	}
+	else
+	{
+		SA_LOG(L"Shader {LitShader.hlsl, mainVS} compilation success.", Info, DX12, shader.Get());
+	}
+
+	return shader;
+}
+
 /**
 * DXC (DirectXShaderCompiler) library is the advanced DirectX 12 API for shader compiling.
 * This library is not native to DirectX12 library but required for compiling mesh shaders.
@@ -342,6 +376,7 @@ MComPtr<ID3DBlob> CompileShader(std::wstring _path, std::wstring _entry, std::ws
 }
 
 
+// = Lit =
 MComPtr<ID3DBlob> litVertexShader; // VkShaderModule -> ID3DBlob
 MComPtr<ID3DBlob> litPixelShader;
 

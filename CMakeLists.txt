@@ -35,7 +35,7 @@ target_compile_options(FVTDX12_mainDX12 PRIVATE /W4 /WX)
 target_include_directories(FVTDX12_mainDX12 PRIVATE ${MY_AGILITY_SDK_INCLUDE_DIR})
 target_compile_definitions(FVTDX12_mainDX12 PRIVATE FORCE_AGILITY_SDK_615=1)
 
-target_link_libraries(FVTDX12_mainDX12 PUBLIC d3d12.lib dxgi.lib dxguid.lib)
+target_link_libraries(FVTDX12_mainDX12 PUBLIC d3d12.lib dxgi.lib dxguid.lib d3dcompiler.lib)
 target_link_libraries(FVTDX12_mainDX12 PUBLIC glfw assimp stb DirectXShaderCompiler SA_Logger SA_Maths)
 
 add_custom_command(
