@@ -176,7 +176,7 @@ MComPtr<ID3D12CommandQueue> graphicsQueue; // VkQueue -> ID3D12CommandQueue
 */
 HANDLE deviceFenceEvent;
 MComPtr<ID3D12Fence> deviceFence;
-uint32_t deviceFenceValue = 0u;
+uint32_t deviceFenceValue = 1u;
 
 void WaitDeviceIdle()
 {
