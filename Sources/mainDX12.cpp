@@ -292,10 +292,11 @@ MComPtr<ID3DBlob> Native_CompileShader(std::wstring _path, std::string _entry, s
 
 /**
 * DXC (DirectXShaderCompiler) library is the advanced DirectX 12 API for shader compiling.
-* This library is not native to DirectX12 library but required for compiling mesh shaders.
+* This library is not native to DirectX12 library but packed in latest Windows SDK.
+* Requires `dxcompiler.lib`m Required for compiling mesh shaders.
 * Base and native DirectX12 shader compilier is d3dcompiler.lib (d3dcompiler.h)
 */
-#include <dxc/dxcapi.h>
+#include <dxcapi.h>
 MComPtr<IDxcUtils> shaderCompilerUtils;
 MComPtr<IDxcCompiler3> shaderCompiler;
 MComPtr<ID3DBlob> CompileShader(std::wstring _path, std::wstring _entry, std::wstring _target, std::vector<std::wstring> _defines = {})
