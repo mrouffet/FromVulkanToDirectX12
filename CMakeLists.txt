@@ -38,6 +38,16 @@ target_compile_definitions(FVTDX12_mainDX12 PRIVATE FORCE_AGILITY_SDK_615=1)
 target_link_libraries(FVTDX12_mainDX12 PUBLIC d3d12.lib dxgi.lib dxguid.lib dxcompiler.lib d3dcompiler.lib)
 target_link_libraries(FVTDX12_mainDX12 PUBLIC glfw assimp stb SA_Logger SA_Maths)
 
+# Find DXC & DXIL runtime DLLs contained from Windows SDK (or VulkanSDK) and copy them to output directory.
+find_file(FVTDX12_DXCOMPILER_DLL dxcompiler.dll REQUIRED)
+find_file(FVTDX12_DXIL_DLL dxil.dll REQUIRED)
+add_custom_command(
+	TARGET FVTDX12_mainDX12 POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different ${FVTDX12_DXCOMPILER_DLL} $<TARGET_FILE_DIR:FVTDX12_mainDX12>
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different ${FVTDX12_DXIL_DLL} $<TARGET_FILE_DIR:FVTDX12_mainDX12>
+	COMMENT "Copy DXC runtime DLLs to target output directory"
+)
+
 add_custom_command(
     TARGET FVTDX12_mainDX12
     POST_BUILD
